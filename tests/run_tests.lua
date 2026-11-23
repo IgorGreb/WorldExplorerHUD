@@ -157,6 +157,7 @@ local function load(saved)
     WE = {}
     LibStub = nil -- fresh library registry per load
     for line in io.lines(ADDON_DIR .. "/WorldExplorerHUD.toc") do
+        line = line:gsub("\r$", "") -- packaged .toc files use CRLF
         if line:match("%.lua$") then
             local path = line:gsub("\\", "/")
             if path:match("^Libs/LibStub") or path:match("^Libs/CallbackHandler") or path:match("^Libs/LibDataBroker") then

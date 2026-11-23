@@ -1,0 +1,35 @@
+World Explorer HUD
+Copyright (c) 2026 Ihor Hreb (IgorGreb). All Rights Reserved.
+
+This software and its source code are the property of the copyright holder.
+The source code is published for reference only.
+
+You MAY:
+  - download and install the addon for your own personal use in World of Warcraft;
+  - read the source code.
+
+You MAY NOT, without prior written permission from the copyright holder:
+  - copy, modify, merge, publish, redistribute, re-upload or mirror this addon
+    or any part of it, in original or modified form, on any website, addon
+    manager, launcher or other distribution channel;
+  - sell, sublicense or otherwise commercially exploit it.
+
+Official distribution channels:
+  - https://www.curseforge.com (project ID 1826132)
+  - https://github.com/IgorGreb/WorldExplorerHUD/releases
+
+THIRD-PARTY LIBRARIES
+The files in the "Libs" folder are NOT covered by this license. They are
+distributed under their own licenses, which take precedence for those files:
+  - LibStub — Public Domain
+  - CallbackHandler-1.0 — BSD, Ace3 Development Team (see Libs/LICENSE-Ace3.txt)
+  - HereBeDragons-2.0 / HereBeDragons-Pins-2.0 — BSD, Nevcairiel
+  - LibDataBroker-1.1 — Public Domain
+  - LibDBIcon-1.0 — license as published by its authors (bundled at package time)
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
+
+World of Warcraft is a trademark of Blizzard Entertainment, Inc. This addon is
+not affiliated with or endorsed by Blizzard Entertainment.

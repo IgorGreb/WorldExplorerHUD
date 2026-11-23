@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1
+- Added LICENSE (All Rights Reserved; bundled libraries keep their own licenses).
+- Packaged builds now include the license file.
+- Documentation: CurseForge description (English + Ukrainian).
+
 ## 0.7.0
 - **Settings panel** (Game Menu → Options → AddOns → World Explorer HUD, or `/we`), built on `Settings.RegisterCanvasLayoutCategory` with a fallback for older clients. All slash commands still work.
 - **Minimap button** via LibDataBroker + LibDBIcon (built-in fallback button when LibDBIcon is not available). Left-click: Explorer's Journal, right-click: settings, Shift-click: show/hide HUD.

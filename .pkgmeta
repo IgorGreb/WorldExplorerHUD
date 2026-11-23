@@ -11,6 +11,7 @@ externals:
 ignore:
   - tests
   - README.md
+  - DESCRIPTION.md
 
 manual-changelog:
   filename: CHANGELOG.md

@@ -5,6 +5,8 @@
 
 *An exploration tracker for WoW Forever: explored areas, secrets and turned-in quests, in English and Ukrainian.*
 
+Повний опис для CurseForge (EN + UA): [DESCRIPTION.md](DESCRIPTION.md).
+
 ## Можливості
 - HUD-віджет із прогресом поточної зони (місця / квести / таємниці).
 - Точки дослідження на карті світу та мінікарті (HereBeDragons), відстеження відстані до точки.

@@ -1,0 +1,33 @@
+## Interface: 16001
+## Title: World Explorer HUD |cffffd100[EN / UA]|r
+## Title-ukUA: World Explorer HUD |cffffd100[EN / UA]|r
+## Notes: Tracks explored zones, subzones, map pins, secrets, and turned-in quests with English and Ukrainian support.
+## Notes-ukUA: Облік досліджених зон, місць, таємниць і зданих квестів. Англійська та українська мови.
+## Author: ExplorerDev
+## Version: @project-version@
+## IconTexture: Interface\Icons\INV_Misc_Map_01
+## X-Category: Map
+## SavedVariables: WorldExplorerDB
+## SavedVariablesPerCharacter: WorldExplorerCharDB
+
+#@no-lib-strip@
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\HereBeDragons\HereBeDragons-2.0.lua
+Libs\HereBeDragons\HereBeDragons-Pins-2.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+#@end-no-lib-strip@
+
+Database.lua
+Locale.lua
+Options.lua
+Tracker.lua
+Toast.lua
+MapPins.lua
+MiniWidget.lua
+Journal.lua
+PinShare.lua
+MinimapButton.lua
+Settings.lua
+Core.lua

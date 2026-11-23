@@ -1,0 +1,17 @@
+package-as: WorldExplorerHUD
+
+enable-nolib-creation: no
+
+# Libraries that are not committed to the repository and are fetched at package time.
+# (LibStub, CallbackHandler, HereBeDragons and LibDataBroker are vendored in Libs/.)
+externals:
+  Libs/LibDBIcon-1.0:
+    url: https://repos.curseforge.com/wow/libdbicon-1-0/trunk/LibDBIcon-1.0
+
+ignore:
+  - tests
+  - README.md
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown

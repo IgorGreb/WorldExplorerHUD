@@ -214,7 +214,7 @@ local legacy = {
 load(legacy)
 fire("ADDON_LOADED", "WorldExplorerHUD")
 local acc = WorldExplorerDB.account.zones
-check(WorldExplorerDB.schemaVersion == 2, "schema bumped")
+check(WorldExplorerDB.schemaVersion == WE.Tracker.SCHEMA_VERSION, "schema bumped")
 check(acc["Mul Gore"] == nil and acc["Zephras Isle"] == nil, "alias keys removed")
 check(acc["Mulgore"].discoveredSubzones["Bloodhoof Village"] and acc["Mulgore"].discoveredSubzones["Thunder Bluff"], "alias records merged, case normalized")
 check(acc["Mulgore"].completedQuests[1] and acc["Mulgore"].completedQuests[2], "quests merged")
@@ -251,7 +251,8 @@ check(WE:GetCurrentZone().key == "Elwynn Forest" and WE:GetCurrentZone().mapID =
 -- quest sync from client flags; turn-in outside list counted separately
 state.completed[7] = true
 WE.Tracker:SyncCompletedQuests("Elwynn Forest")
-fire("QUEST_TURNED_IN", 99999, "Random")
+fire("QUEST_TURNED_IN", 99999, 450, 0) -- real event args: questID, xpReward, moneyReward
+check(WE.Tracker:GetZoneRecords("Elwynn Forest").questTitles[99999] == nil, "XP reward is not stored as a quest title")
 st = WE.Tracker:GetZoneStats("Elwynn Forest", false)
 check(st.questsDone == 1 and st.questsTurnedIn == 2, "list quests vs all turned in: " .. st.questsDone .. "/" .. st.questsTurnedIn)
 -- zone without quest list: no fake total
@@ -593,11 +594,78 @@ chat = {}
 load(nil)
 coreFrame.scripts.OnUpdate(coreFrame, 1) -- before ADDON_LOADED must not error
 fire("ADDON_LOADED", "WorldExplorerHUD")
-check(WorldExplorerDB.schemaVersion == 2, "fresh install schema")
+check(WorldExplorerDB.schemaVersion == WE.Tracker.SCHEMA_VERSION, "fresh install schema")
 local mig = false
 for _, m in ipairs(chat) do if m:find("upgraded") then mig = true end end
 check(not mig, "no migration message on fresh install")
 state.mapID = 1429; fire("PLAYER_ENTERING_WORLD"); tick()
+
+---------------------------------------------------------------- 13. 0.7.2 fixes
+-- schema 2 -> 3: numeric quest "titles" (0.7.0 bug) dropped, colliding custom pins renamed
+local v2 = {
+    schemaVersion = 2,
+    account = { zones = {
+        ["Elwynn Forest"] = { discoveredSubzones = {}, extraSubzones = { ["Lion's Pride Inn"] = true },
+            completedQuests = { [7] = true, [783] = true }, questTitles = { [7] = "Report to Goldshire", [783] = 450 },
+            secretsFound = {}, learnedPins = {},
+            customPins = { { name = "Goldshire", x = 10, y = 10 }, { name = "Camp", x = 30, y = 30 } } },
+    } },
+    characters = { ["Alice-Forever"] = { level = 5, zones = {
+        ["Elwynn Forest"] = { discoveredSubzones = {}, extraSubzones = {}, completedQuests = { [783] = true },
+            questTitles = { [783] = 0 }, secretsFound = {} },
+    } } },
+}
+chat = {}
+load(v2); fire("ADDON_LOADED", "WorldExplorerHUD")
+local ez = WorldExplorerDB.account.zones["Elwynn Forest"]
+check(WorldExplorerDB.schemaVersion == 3, "schema 2 -> 3")
+check(ez.questTitles[783] == nil and ez.questTitles[7] == "Report to Goldshire", "numeric quest titles dropped, real ones kept")
+check(WorldExplorerDB.characters["Alice-Forever"].zones["Elwynn Forest"].questTitles[783] == nil, "character numeric title dropped")
+check(ez.customPins[1].name == "Goldshire *" and ez.customPins[2].name == "Camp", "colliding custom pin renamed, other kept")
+check(ez.extraSubzones["Lion's Pride Inn"], "extra areas untouched by migration")
+local upgradedMsg = false
+for _, m in ipairs(chat) do if m:find("upgraded") then upgradedMsg = true end end
+check(not upgradedMsg, "no zone-format notice for schema 2 -> 3")
+
+-- mixed numeric/string titles no longer break the sorted quest list (HUD tooltip, /we quests)
+ez.questTitles[999] = 1234 -- simulate a leftover bad entry
+ez.completedQuests[999] = true
+C_QuestLog.GetTitleForQuestID = function(id) if id == 783 then return "A Threat Within" end end
+local okList, list = pcall(WE.Tracker.GetCompletedQuestList, WE.Tracker, "Elwynn Forest", true)
+check(okList, "quest list with a bad stored title does not error")
+local allStr = okList
+for _, q in ipairs(okList and list or {}) do if type(q.title) ~= "string" then allStr = false end end
+check(allStr, "all quest list titles are strings")
+state.mapID = 1429
+fire("QUEST_TURNED_IN", 783, 450, 0)
+check(WE.Tracker:GetZoneRecords("Elwynn Forest").questTitles[783] == "A Threat Within", "turn-in title read from the client")
+check(pcall(SlashCmdList.WORLDEXPLORER, "quests"), "/we quests works")
+C_QuestLog.GetTitleForQuestID = nil
+
+-- custom pins never complete a database point
+chat = {}
+goTo(1429, 0.10, 0.10, "")
+WE.Tracker:AddCustomPin("goldshire")
+local renamed
+for _, p in ipairs(ez.customPins) do if p.name == "goldshire *" then renamed = p end end
+check(renamed ~= nil, "/we addpin with a database point name gets a suffix (case-insensitive)")
+check(chat[#chat] and chat[#chat]:find("goldshire *", 1, true), "rename notice printed")
+local function mk2(payload) return "!WEP1!" .. payload .. "!" .. WE.PinShare._Checksum(payload) end
+local imp = mk2("Elwynn Forest~20~20~Tower of Azora")
+check(WE.PinShare:Import(imp) == 1, "import of a colliding name adds a pin")
+local importedRenamed = false
+for _, p in ipairs(ez.customPins) do if p.name == "Tower of Azora *" then importedRenamed = true end end
+check(importedRenamed, "imported pin renamed")
+check(WE.PinShare:Import(imp) == 0, "re-import of the same pin is a duplicate")
+goTo(1429, 0.20, 0.20, "")
+tick()
+local charZ = WE.Tracker:GetZoneRecords("Elwynn Forest")
+check(charZ.discoveredSubzones["Tower of Azora *"], "custom pin itself is discovered")
+check(not charZ.discoveredSubzones["Tower of Azora"], "database point not completed by a custom pin")
+goTo(1429, 0.10, 0.10, "")
+tick()
+check(not WE.Tracker:GetZoneRecords("Elwynn Forest").discoveredSubzones["Goldshire"], "database Goldshire not completed by 'goldshire *'")
+check(WE:L("extraAreasLabel"):find("%", 1, true) == nil, "extraAreasLabel has no stray %")
 
 print(string.format("%d passed, %d failed", passed, failed))
 os.exit(failed == 0 and 0 or 1)

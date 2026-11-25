@@ -22,7 +22,7 @@ local function InitSavedVariables()
     WorldExplorerDB.characters = WorldExplorerDB.characters or {}
     WorldExplorerDB.mapIDCache = WorldExplorerDB.mapIDCache or {}
     if next(WorldExplorerDB.account.zones) == nil and next(WorldExplorerDB.characters) == nil then
-        WorldExplorerDB.schemaVersion = 2 -- fresh install, nothing to migrate
+        WorldExplorerDB.schemaVersion = WE.Tracker.SCHEMA_VERSION -- fresh install, nothing to migrate
     end
     WE.Options:InitDefaults()
 end
@@ -128,7 +128,7 @@ eventFrame:SetScript("OnUpdate", function(self, elapsed)
     end
 end)
 
-eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2)
+eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == addonName then
         InitSavedVariables()
         local migrated = WE.Tracker:MigrateSavedVariables()
@@ -148,7 +148,8 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1, arg2)
         WE.UI:Refresh()
         WE.MapPins:Refresh()
     elseif event == "QUEST_TURNED_IN" then
-        WE.Tracker:RecordQuestTurnIn(arg1, arg2)
+        -- QUEST_TURNED_IN args are questID, xpReward, moneyReward: there is no title.
+        WE.Tracker:RecordQuestTurnIn(arg1)
         WE.UI:Refresh()
     end
 end)

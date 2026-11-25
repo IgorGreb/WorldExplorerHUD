@@ -6,7 +6,9 @@ local Tracker = WE.Tracker
 -- Distance (in map percent) at which a discovery point / secret counts as reached.
 local STRICT_PROXIMITY_RADIUS = 1.25
 
-local SCHEMA_VERSION = 2
+-- 2: zones keyed by uiMapID (0.5.0). 3: quest-title / custom-pin cleanup (0.7.1).
+local SCHEMA_VERSION = 3
+Tracker.SCHEMA_VERSION = SCHEMA_VERSION
 
 local function CountKeys(tbl)
     if not tbl then return 0 end
@@ -280,6 +282,25 @@ function Tracker:SetDiscoveryState(zoneKey, field, id, state, accountScope)
 end
 
 ---------------------------------------------------------------------------
+-- Custom pin names
+---------------------------------------------------------------------------
+
+-- Custom pins share the discoveredSubzones namespace with database points, so a
+-- custom pin must never carry a database point's name: reaching it would complete
+-- that point. Returns the name unchanged, or a suffixed variant ("Name *").
+local function UniqueCustomName(zoneKey, name)
+    local meta = WE:GetZoneMeta(zoneKey)
+    if not meta or not WE:FindDiscoveryPoint(meta, name) then return name end
+    local candidate, n = name .. " *", 2
+    while WE:FindDiscoveryPoint(meta, candidate) do
+        candidate = name .. " *" .. n
+        n = n + 1
+    end
+    return candidate
+end
+Tracker.UniqueCustomName = UniqueCustomName
+
+---------------------------------------------------------------------------
 -- Migration of saved variables (pre-0.5.0 -> schema 2)
 ---------------------------------------------------------------------------
 
@@ -323,16 +344,44 @@ local function MigrateZonesTable(zonesTbl, isAccount, accountZones)
     return result
 end
 
+-- Schema 3 (0.7.1):
+--  * drops quest "titles" that were really XP numbers (QUEST_TURNED_IN arg bug in 0.7.0);
+--  * renames custom pins that carry a database point's name.
+local function CleanQuestTitles(rec)
+    for qid, title in pairs(rec.questTitles or {}) do
+        if type(title) ~= "string" or title == "" then rec.questTitles[qid] = nil end
+    end
+end
+
+local function MigrateToV3(db)
+    for zoneKey, rec in pairs(db.account.zones) do
+        CleanQuestTitles(rec)
+        for _, p in ipairs(rec.customPins or {}) do
+            p.name = UniqueCustomName(zoneKey, p.name)
+        end
+    end
+    for _, entry in pairs(db.characters) do
+        for _, rec in pairs(entry.zones or {}) do CleanQuestTitles(rec) end
+    end
+end
+
+-- Returns true only when the zone-key format changed (that is what the chat notice says).
 function Tracker:MigrateSavedVariables()
     local db = WorldExplorerDB
-    if (db.schemaVersion or 1) >= SCHEMA_VERSION then return false end
+    local from = db.schemaVersion or 1
+    if from >= SCHEMA_VERSION then return false end
 
-    db.account.zones = MigrateZonesTable(db.account.zones or {}, true, nil)
-    for _, entry in pairs(db.characters) do
-        entry.zones = MigrateZonesTable(entry.zones or {}, false, db.account.zones)
+    if from < 2 then
+        db.account.zones = MigrateZonesTable(db.account.zones or {}, true, nil)
+        for _, entry in pairs(db.characters) do
+            entry.zones = MigrateZonesTable(entry.zones or {}, false, db.account.zones)
+        end
+    end
+    if from < 3 then
+        MigrateToV3(db)
     end
     db.schemaVersion = SCHEMA_VERSION
-    return true
+    return from < 2
 end
 
 ---------------------------------------------------------------------------
@@ -449,6 +498,11 @@ function Tracker:AddCustomPin(pinName)
     local _, accZone = self:EnsureZoneRecord(ctx.key, ctx.name)
     pinName = WE.SanitizePinName(pinName)
     if pinName == "" then pinName = string.format("(%.1f, %.1f)", px, py) end
+    local unique = UniqueCustomName(ctx.key, pinName)
+    if unique ~= pinName then
+        DEFAULT_CHAT_FRAME:AddMessage(string.format(WE:L("customPinRenamed"), pinName, unique))
+        pinName = unique
+    end
     table.insert(accZone.customPins, { name = pinName, x = px, y = py })
     DEFAULT_CHAT_FRAME:AddMessage(string.format(WE:L("customPinAdded"), pinName, px, py))
     if WE.MapPins then WE.MapPins:Refresh() end
@@ -491,6 +545,7 @@ function Tracker:AddCustomPinTo(zoneKey, name, x, y, displayName)
     local _, accZone = self:EnsureZoneRecord(zoneKey, displayName)
     if not accZone then return false end
     if #accZone.customPins >= MAX_PINS_PER_ZONE then return false end
+    name = UniqueCustomName(zoneKey, name)
     for _, p in ipairs(accZone.customPins) do
         if p.name == name or (math.abs(p.x - x) < 0.3 and math.abs(p.y - y) < 0.3) then
             return false
@@ -572,7 +627,8 @@ function Tracker:CheckProximityToPins(ctx)
 
     if px and accZone and accZone.customPins then
         for _, pt in ipairs(accZone.customPins) do
-            if not isDone("discoveredSubzones", pt.name) and Dist(px, py, pt.x, pt.y) <= STRICT_PROXIMITY_RADIUS then
+            if not isDone("discoveredSubzones", pt.name) and Dist(px, py, pt.x, pt.y) <= STRICT_PROXIMITY_RADIUS
+                and not WE:FindDiscoveryPoint(meta, pt.name) then -- never complete a database point via a custom pin
                 changed = self:DiscoverPoint(ctx, pt.name, pt.name) or changed
                 charZone = self:GetZoneRecords(ctx.key)
             end
@@ -633,8 +689,9 @@ function Tracker:RecordQuestTurnIn(questID, questTitle)
     charZone.completedQuests[questID] = true
     accZone.completedQuests[questID] = true
 
-    local title = questTitle
-    if (not title or title == "") and C_QuestLog and C_QuestLog.GetTitleForQuestID then
+    -- Only a real string counts as a title (0.7.0 stored the XP reward here by mistake).
+    local title = (type(questTitle) == "string" and questTitle ~= "") and questTitle or nil
+    if not title and C_QuestLog and C_QuestLog.GetTitleForQuestID then
         local ok, t = pcall(C_QuestLog.GetTitleForQuestID, questID)
         if ok and t then title = t end
     end
@@ -668,9 +725,10 @@ function Tracker:GetCompletedQuestList(zoneKey, useAccountScope)
     for qid, done in pairs(source.completedQuests) do
         if done then
             local title = source.questTitles and source.questTitles[qid]
+            if type(title) ~= "string" or title == "" then title = nil end
             if not title and C_QuestLog and C_QuestLog.GetTitleForQuestID then
                 local ok, t = pcall(C_QuestLog.GetTitleForQuestID, qid)
-                if ok and t and t ~= "" then
+                if ok and type(t) == "string" and t ~= "" then
                     title = t
                     source.questTitles[qid] = t
                 end

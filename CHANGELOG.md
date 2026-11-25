@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.2
+- **Fixed:** hovering the HUD widget (and `/we quests`) could throw a Lua error ("attempt to compare string with number"). The addon saved a quest's XP reward as its title; quest titles are now read from the game client, and the bad entries already saved are cleaned up automatically.
+- **Fixed:** a custom pin with the same name as a map discovery point (added with `/we addpin` or imported) could mark that discovery point as explored. Such pins now get a " *" suffix (e.g. "Goldshire *"); existing ones are renamed once.
+- Tooltip label now reads "Other Areas (not in database)" instead of showing a stray "%".
+- Ukrainian text fixes (Stromgarde secret descriptions).
+- Saved data schema 3: upgraded automatically on first login, nothing to do.
+- Supported game client: English. The addon interface is available in English and Ukrainian (`/we lang`).
+
 ## 0.7.1
 - Added LICENSE (All Rights Reserved; bundled libraries keep their own licenses).
 - Packaged builds now include the license file.
